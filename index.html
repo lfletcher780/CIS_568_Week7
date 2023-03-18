@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Force Layout</title>
+    <style>
+        svg{
+            width: 100vw;
+            height: 100vh;
+            margin: 0;
+        }
+    </style>
+    <style>
+        .group{fill-opacity: .15;
+                    stroke-opacity: .25;}
+        
+
+    </style>
+    <script src ="libs/d3.js"></script>
+</head>
+<body>
+    <div class="font" style="font-size: 28px;"></div>
+<script>
+    const width = 200
+    const height = 2000
+    let svg = d3.select("body").append("svg")
+        .attr("viewBox", `0 0 ${width} ${height}`);
+
+    d3.json("./data/publication_network.json").then(data=>{
+        
+        let gCanvas = svg.append("g").attr("class","canvas");
+
+        let degrees = {};
+
+        d3.map(data.links, function(d){
+            if(degrees.hasOwnProperty(d.source))
+            {
+                degrees[d.source]++
+            }
+            else {
+                degrees[d.source]=0
+            }
+            if(degrees.hasOwnProperty(d.target))
+            {
+                degrees[d.target]++
+            }
+            else {
+                degrees[d.target]=0 
+            }
+
+        })
+
+        const degreeExtent = d3.extent(d3.map(data.nodes,function(d){return d.Country}))
+
+        let color = d3.scaleOrdinal(d3.schemeCategory10).domain(degreeExtent)
+
+        let scale_radius = d3.scaleLinear()
+            .domain(d3.extent(Object.values(degrees)))
+            .range([5,18])
+
+        let scale_radius_sqt = d3.scaleSqrt().domain([0,200]).range([5,18])
+
+        let gLinks = gCanvas.selectAll('.links')
+            .data(data.links)
+            .enter()
+            .append("line")
+            .attr("stroke","black")
+
+        let gNodes = gCanvas.selectAll()
+            .data(data.nodes)
+            .enter()
+            .append('g')
+
+            gNodes.append("circle").attr("r",function(d,i){
+                        if (d.Citations!=undefined) {
+                            return scale_radius_sqt(d.Citations)
+                        }
+                        else {return scale_radius(0)}
+
+                    })
+            .attr("fill",d=>color(d.Country))
+            .attr("class",d=>d.Country)
+
+        gNodes.on("mouseenter", function (m,d) {
+                        
+                        d3.selectAll("circle").classed("group", true)
+                        d3.selectAll("line").classed("group", true)
+                        d3.selectAll('.'+d.Country).classed("group", false)
+                        d3.select(".font").text(d.Country)
+                        
+                })
+
+        gNodes.on("mouseleave", function (m,d) {
+                    
+                    d3.selectAll("circle").classed("group", false).duration('300')
+                    d3.selectAll("line").classed("group", false).duration('300')
+                    d3.select(".font").text("").attr("x",1500).attr("y",200)
+                    
+                    })    
+
+        let fSim = d3.forceSimulation(data.nodes)
+            .force('center',d3.forceCenter(width/2,height/2))
+            .force('links',d3.forceLink(data.links).id(function(n) {return n.id; }))
+            .force("collide", d3.forceCollide().radius(function(d,i){return scale_radius_sqt((d.Citations)*1.5)}))
+            .force('charge', d3.forceManyBody().strength(-10))
+            .on('tick', update)
+
+        function update(){
+            
+            gNodes.attr("transform", d=>{
+                return `translate(${d.x},${d.y})`})
+
+            gLinks.attr('x1', d=>d.source.x)
+                .attr('x2', d=>d.target.x) 
+                .attr('y1', d=>d.source.y)
+                .attr('y2', d=> d.target.y) 
+            }
+    })
+</script>
+</body>
+</html>
